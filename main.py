@@ -18,7 +18,7 @@ class Home(webapp2.RequestHandler):
     def delete(self):
         # Delete all Datastore entries
         listOfBookKeys = Movie.query().fetch(keys_only=True)
-        listOfCustomerKeys = streamingProvider.query().fetch(keys_only=True)
+        listOfCustomerKeys = StreamingProvider.query().fetch(keys_only=True)
         ndb.delete_multi(listOfBookKeys)
         ndb.delete_multi(listOfCustomerKeys)
         self.response.write("All entries successfully deleted.")
@@ -85,6 +85,31 @@ class MovieHandler(webapp2.RequestHandler):
             movieObj.key.delete()
             self.response.write(movieObj.title + " has been deleted.")
 
+    def put(self, movieId=None):
+        if movieId:
+            titlePresent = False
+            movieObj = Movie.get_by_id(int(movieId))
+            movieData = json.loads(self.request.body)
+            # Title field must be present to PUT
+            for key, value in movieData.iteritems():
+                if key == "title":
+                    titlePresent = True
+            if titlePresent:
+                # Reset all JSON properties
+                setattr(movieObj, "year", None)
+                setattr(movieObj, "genres", [])
+                setattr(movieObj, "director", "")
+                setattr(movieObj, "actors", [])
+                setattr(movieObj, "running_time", None)
+                setattr(movieObj, "streaming_providers", [])
+                # Update properties with PUT values
+                for key, value in movieData.iteritems():
+                    setattr(movieObj, key, value)
+                movieObj.put()
+                self.response.write(json.dumps(movieObj.to_dict()))
+            else:
+                self.response.write("title field required!")
+
     def patch(self, movieId=None):
         if movieId:
             movieObj = Movie.get_by_id(int(movieId))
@@ -98,37 +123,59 @@ class MovieHandler(webapp2.RequestHandler):
 class StreamingProviderHandler(webapp2.RequestHandler):
     def post(self):
         streamingProviderData = json.loads(self.request.body)
-        newStreamingProvider = streamingProvider(name=streamingProviderData['name'])
+        newStreamingProvider = StreamingProvider(name=streamingProviderData['name'])
         # propagate values for newStreamingProvider
         for key, value in streamingProviderData.iteritems():
             setattr(newStreamingProvider, key, value)
         newStreamingProvider.put()
         newStreamingProvider.id = newStreamingProvider.key.id()
-        newStreamingProvider.self = "/streaming_provider/" + str(newStreamingProvider.key.id())
+        newStreamingProvider.self = "/streaming-providers/" + str(newStreamingProvider.key.id())
         newStreamingProvider.put()
         self.response.write(json.dumps(newStreamingProvider.to_dict()))
 
     def get(self, streamingProviderId=None):
         if streamingProviderId:
-            streamingProviderObj = streamingProvider.get_by_id(int(streamingProviderId))
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
             self.response.write(json.dumps(streamingProviderObj.to_dict()))
         else:
             # List all streaming providers
             listOfStreamingProviders = []
-            allStreamingProvidersQuery = streamingProvider.query()
+            allStreamingProvidersQuery = StreamingProvider.query()
             for eachStreamingProvider in allStreamingProvidersQuery.fetch():
                 listOfStreamingProviders.append(eachStreamingProvider.to_dict())
             self.response.write(json.dumps(listOfStreamingProviders))
 
     def delete(self, streamingProviderId=None):
         if streamingProviderId:
-            streamingProviderObj = streamingProvider.get_by_id(int(streamingProviderId))
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
             streamingProviderObj.key.delete()
             self.response.write(streamingProviderObj.name + " has been deleted.")
 
+    def put(self, streamingProviderId=None):
+        if streamingProviderId:
+            namePresent = False
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
+            streamingProviderData = json.loads(self.request.body)
+            # Title field must be present to PUT
+            for key, value in streamingProviderData.iteritems():
+                if key == "name":
+                    namePresent = True
+            if namePresent:
+                # Reset all JSON properties
+                setattr(streamingProviderObj, "number_of_titles", None)
+                setattr(streamingProviderObj, "movies", [])
+                setattr(streamingProviderObj, "exclusive_movies", [])
+                # Update properties with PUT values
+                for key, value in streamingProviderData.iteritems():
+                    setattr(streamingProviderObj, key, value)
+                streamingProviderObj.put()
+                self.response.write(json.dumps(streamingProviderObj.to_dict()))
+            else:
+                self.response.write("name field required!")
+
     def patch(self, streamingProviderId=None):
         if streamingProviderId:
-            streamingProviderObj = streamingProvider.get_by_id(int(streamingProviderId))
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
             streamingProviderData = json.loads(self.request.body)
             # patch attribute values for streamingProviderObj
             for key, value in streamingProviderData.iteritems():
@@ -136,44 +183,44 @@ class StreamingProviderHandler(webapp2.RequestHandler):
             streamingProviderObj.put()
             self.response.write(json.dumps(streamingProviderObj.to_dict()))
 
-class CustomerBooksHandler(webapp2.RequestHandler):
+class ProviderGetMoviesHandler(webapp2.RequestHandler):
     def get(self, streamingProviderId=None):
         if streamingProviderId:
-            streamingProviderObj = streamingProvider.get_by_id(int(streamingProviderId))
-            bookList = []
-            booksCheckedOut = streamingProviderObj.checked_out
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
+            movieList = []
+            moviesAvailable = streamingProviderObj.movies
             # Fetch Movie links from checked_out list
-            for Movie in booksCheckedOut:
-                url = "http://rest-nguyenp2.appspot.com" + Movie
+            for movie in moviesAvailable:
+                url = "http://localhost:8080" + movie
                 result = urlfetch.fetch(url)
                 if result.status_code == 200:
-                    bookList.append(result.content)
+                    movieList.append(result.content)
                 else:
                     self.response.status_code = result.status_code
-            self.response.write(bookList)
+            self.response.write(movieList)
 
-class CheckoutHandler(webapp2.RequestHandler):
+class ProviderAddRemoveMoviesHandler(webapp2.RequestHandler):
     def put(self, streamingProviderId=None, movieId=None):
         if streamingProviderId and movieId:
-            streamingProviderObj = streamingProvider.get_by_id(int(streamingProviderId))
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
             movieObj = Movie.get_by_id(int(movieId))
-            # Add checked out Movie to streamingProvider's list
-            streamingProviderObj.checked_out.append("/books/" + str(movieId))
+            # Add Movie link to StreamingProvider's list
+            streamingProviderObj.movies.append("/movies/" + str(movieId))
             streamingProviderObj.put()
-            # Set Movie status to checked out
-            movieObj.checkedIn = False
+            # Add StreamingProvider link to Movie's list
+            movieObj.streaming_providers.append("/streaming_providers/" + str(streamingProviderId))
             movieObj.put()
             self.response.write(json.dumps(streamingProviderObj.to_dict()))
 
     def delete(self, streamingProviderId=None, movieId=None):
         if streamingProviderId and movieId:
-            streamingProviderObj = streamingProvider.get_by_id(int(streamingProviderId))
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
             movieObj = Movie.get_by_id(int(movieId))
-            # Remove checked out Movie from streamingProvider's list
-            streamingProviderObj.checked_out.remove("/books/" + str(movieId))
+            # Remove Movie link from StreamingProvider's list
+            streamingProviderObj.movies.remove("/movies/" + str(movieId))
             streamingProviderObj.put()
-            # Set Movie status to checked in
-            movieObj.checkedIn = True
+            # Removie StreamingProvider link from Movie's list
+            movieObj.streaming_providers.remove("/streaming_providers/" + str(streamingProviderId))
             movieObj.put()
             self.response.write(json.dumps(streamingProviderObj.to_dict()))
 
@@ -191,11 +238,15 @@ app = webapp2.WSGIApplication([
 
     # webapp2.Route(r'/movies<queryString:\s+>', handler=BookHandler),
 
-    ('/customers', CustomerHandler),
+    ('/streaming-providers', StreamingProviderHandler),
 
-    webapp2.Route(r'/customers/<streamingProviderId:\d+>', handler=CustomerHandler),
+    webapp2.Route(r'/streaming-providers/<streamingProviderId:\d+>', handler=StreamingProviderHandler),
 
-    webapp2.Route(r'/customers/<streamingProviderId:\d+>/books', handler=CustomerBooksHandler),
+    webapp2.Route(r'/streaming-providers/<streamingProviderId:\d+>/movies', handler=ProviderGetMoviesHandler),
 
-    webapp2.Route(r'/customers/<streamingProviderId:\d+>/books/<movieId:\d+>', handler=CheckoutHandler),
+    webapp2.Route(r'/streaming-providers/<streamingProviderId:\d+>/exclusive-movies', handler=ProviderGetExclusiveMoviesHandler),
+
+    webapp2.Route(r'/streaming-providers/<streamingProviderId:\d+>/movies/<movieId:\d+>', handler=ProviderAddRemoveMoviesHandler),
+
+    webapp2.Route(r'/streaming-providers/<streamingProviderId:\d+>/exclusive-movies/<movieId:\d+>', handler=ProviderAddRemoveExclusiveMoviesHandler),
 ], debug=True)

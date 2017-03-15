@@ -1,0 +1,29 @@
+
+{
+	"title": "Blue Velvet",
+	"year": 1986,
+	"genres": ["horror", "drama"],
+	"director": "David Lynch",
+	"actors": ["Kyle MacLachlan", "Laura Dern"],
+	"running_time": 120
+}
+
+{
+	"title": "Heat",
+	"year": 1995,
+	"genres": ["crime", "action"],
+	"director": "Michael Mann",
+	"actors": ["Al Pacino", "Robert De Niro"],
+	"running_time": 170
+}
+
+
+{
+	"name": "Netflix",
+	"number_of_titles": 7000
+}
+
+{
+	"name": "Amazon",
+	"number_of_titles": 10000
+}
