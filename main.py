@@ -1,9 +1,10 @@
-###########################################
+###############################################################
 # Author: Peter Nguyen
-# Date:
+# Date: 3/19/17
 # CS496-400
-# Description:
-###########################################
+# Description: Final Project. REST API back end implemented
+# with Google App Engine ndb and webapp2
+###############################################################
 
 from google.appengine.ext import ndb
 from google.appengine.api import urlfetch
@@ -30,6 +31,7 @@ class Movie(ndb.Model):
     genres = ndb.StringProperty(repeated=True)
     director = ndb.StringProperty()
     actors = ndb.StringProperty(repeated=True)
+    running_time = ndb.IntegerProperty()
     streaming_providers = ndb.StringProperty(repeated=True)
     self = ndb.StringProperty()
 
@@ -58,19 +60,14 @@ class MovieHandler(webapp2.RequestHandler):
         if movieId:
             movieObj = Movie.get_by_id(int(movieId))
             self.response.write(json.dumps(movieObj.to_dict()))
-        # Check for a query string value
-        qStrVal = self.request.get('checkedIn')
-        checkedOutList = []
+        # Query by movie's title
+        qStrVal = self.request.get('title')
+        movieQueryList = []
         if qStrVal:
-            if qStrVal == "true":
-                query = Movie.query(Movie.checkedIn == True)
-                for result in query.fetch():
-                    checkedOutList.append(result.to_dict())
-            elif qStrVal == "false":
-                query = Movie.query(Movie.checkedIn == False)
-                for result in query.fetch():
-                    checkedOutList.append(result.to_dict())
-            self.response.write(json.dumps(checkedOutList))
+            query = Movie.query(Movie.title == qStrVal)
+            for result in query.fetch():
+                movieQueryList.append(result.to_dict())
+            self.response.write(json.dumps(movieQueryList))
         elif not movieId:
             # List all movies
             listOfMovies = []
@@ -133,11 +130,19 @@ class StreamingProviderHandler(webapp2.RequestHandler):
         newStreamingProvider.put()
         self.response.write(json.dumps(newStreamingProvider.to_dict()))
 
-    def get(self, streamingProviderId=None):
+    def get(self, streamingProviderId=None, queryString=None):
         if streamingProviderId:
             streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
             self.response.write(json.dumps(streamingProviderObj.to_dict()))
-        else:
+        # Query by streaming provider's name
+        qStrVal = self.request.get('name')
+        providerQueryList = []
+        if qStrVal:
+            query = StreamingProvider.query(StreamingProvider.name == qStrVal)
+            for result in query.fetch():
+                providerQueryList.append(result.to_dict())
+            self.response.write(json.dumps(providerQueryList))
+        elif not streamingProviderId:
             # List all streaming providers
             listOfStreamingProviders = []
             allStreamingProvidersQuery = StreamingProvider.query()
@@ -191,13 +196,31 @@ class ProviderGetMoviesHandler(webapp2.RequestHandler):
             moviesAvailable = streamingProviderObj.movies
             # Fetch Movie links from checked_out list
             for movie in moviesAvailable:
-                url = "http://localhost:8080" + movie
+                url = "https://final-project-nguyenp2.appspot.com" + movie
+                # url = "http://localhost:8080" + movie
                 result = urlfetch.fetch(url)
                 if result.status_code == 200:
-                    movieList.append(result.content)
+                    movieList.append(json.loads(result.content))
                 else:
                     self.response.status_code = result.status_code
-            self.response.write(movieList)
+            self.response.write(json.dumps(movieList))
+
+class ProviderGetExclusiveMoviesHandler(webapp2.RequestHandler):
+    def get(self, streamingProviderId=None):
+        if streamingProviderId:
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
+            movieList = []
+            moviesAvailable = streamingProviderObj.exclusive_movies
+            # Fetch Movie links from checked_out list
+            for movie in moviesAvailable:
+                url = "https://final-project-nguyenp2.appspot.com" + movie
+                # url = "http://localhost:8080" + movie
+                result = urlfetch.fetch(url)
+                if result.status_code == 200:
+                    movieList.append(json.loads(result.content))
+                else:
+                    self.response.status_code = result.status_code
+            self.response.write(json.dumps(movieList))
 
 class ProviderAddRemoveMoviesHandler(webapp2.RequestHandler):
     def put(self, streamingProviderId=None, movieId=None):
@@ -208,7 +231,7 @@ class ProviderAddRemoveMoviesHandler(webapp2.RequestHandler):
             streamingProviderObj.movies.append("/movies/" + str(movieId))
             streamingProviderObj.put()
             # Add StreamingProvider link to Movie's list
-            movieObj.streaming_providers.append("/streaming_providers/" + str(streamingProviderId))
+            movieObj.streaming_providers.append("/streaming-providers/" + str(streamingProviderId))
             movieObj.put()
             self.response.write(json.dumps(streamingProviderObj.to_dict()))
 
@@ -220,7 +243,32 @@ class ProviderAddRemoveMoviesHandler(webapp2.RequestHandler):
             streamingProviderObj.movies.remove("/movies/" + str(movieId))
             streamingProviderObj.put()
             # Removie StreamingProvider link from Movie's list
-            movieObj.streaming_providers.remove("/streaming_providers/" + str(streamingProviderId))
+            movieObj.streaming_providers.remove("/streaming-providers/" + str(streamingProviderId))
+            movieObj.put()
+            self.response.write(json.dumps(streamingProviderObj.to_dict()))
+
+class ProviderAddRemoveExclusiveMoviesHandler(webapp2.RequestHandler):
+    def put(self, streamingProviderId=None, movieId=None):
+        if streamingProviderId and movieId:
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
+            movieObj = Movie.get_by_id(int(movieId))
+            # Add Movie link to StreamingProvider's list
+            streamingProviderObj.exclusive_movies.append("/movies/" + str(movieId))
+            streamingProviderObj.put()
+            # Add StreamingProvider link to Movie's list
+            movieObj.streaming_providers.append("/streaming-providers/" + str(streamingProviderId))
+            movieObj.put()
+            self.response.write(json.dumps(streamingProviderObj.to_dict()))
+
+    def delete(self, streamingProviderId=None, movieId=None):
+        if streamingProviderId and movieId:
+            streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
+            movieObj = Movie.get_by_id(int(movieId))
+            # Remove Movie link from StreamingProvider's list
+            streamingProviderObj.exclusive_movies.remove("/movies/" + str(movieId))
+            streamingProviderObj.put()
+            # Removie StreamingProvider link from Movie's list
+            movieObj.streaming_providers.remove("/streaming-providers/" + str(streamingProviderId))
             movieObj.put()
             self.response.write(json.dumps(streamingProviderObj.to_dict()))
 
@@ -236,11 +284,13 @@ app = webapp2.WSGIApplication([
 
     webapp2.Route(r'/movies/<movieId:\d+>', handler=MovieHandler),
 
-    # webapp2.Route(r'/movies<queryString:\s+>', handler=BookHandler),
+    webapp2.Route(r'/movies?<queryString:\s+>', handler=MovieHandler),
 
     ('/streaming-providers', StreamingProviderHandler),
 
     webapp2.Route(r'/streaming-providers/<streamingProviderId:\d+>', handler=StreamingProviderHandler),
+
+    webapp2.Route(r'/streaming-providers?<queryString:\s+>', handler=StreamingProviderHandler),
 
     webapp2.Route(r'/streaming-providers/<streamingProviderId:\d+>/movies', handler=ProviderGetMoviesHandler),
 

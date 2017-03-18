@@ -17,6 +17,19 @@
 	"running_time": 170
 }
 
+{
+	"title": "Miller's Crossing",
+	"year": 1990,
+	"director": "Coen Brothers",
+	"running_time": 115
+}
+
+{
+	"title": "Arrival",
+	"year": 2016,
+	"actors": ["Amy Adams", "Jeremy Renner"]
+}
+
 
 {
 	"name": "Netflix",
