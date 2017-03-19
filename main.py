@@ -46,15 +46,22 @@ class StreamingProvider(ndb.Model):
 class MovieHandler(webapp2.RequestHandler):
     def post(self):
         movieData = json.loads(self.request.body)
-        newMovie = Movie(title=movieData['title'])
-        # propagate values for newMovie
+        # Title field must be present to POST
         for key, value in movieData.iteritems():
-            setattr(newMovie, key, value)
-        newMovie.put()
-        newMovie.id = newMovie.key.id()
-        newMovie.self = "/movies/" + str(newMovie.key.id())
-        newMovie.put()
-        self.response.write(json.dumps(newMovie.to_dict()))
+            if key == "title":
+                titlePresent = True
+        if titlePresent:
+            newMovie = Movie(title=movieData['title'])
+            # propagate values for newMovie
+            for key, value in movieData.iteritems():
+                setattr(newMovie, key, value)
+            newMovie.put()
+            newMovie.id = newMovie.key.id()
+            newMovie.self = "/movies/" + str(newMovie.key.id())
+            newMovie.put()
+            self.response.write("Movie successfully added!")
+        else:
+            self.response.write("Title field required.")
 
     def get(self, movieId=None, queryString=None):
         if movieId:
@@ -80,7 +87,7 @@ class MovieHandler(webapp2.RequestHandler):
         if movieId:
             movieObj = Movie.get_by_id(int(movieId))
             movieObj.key.delete()
-            self.response.write(movieObj.title + " has been deleted.")
+            self.response.write(movieObj.title + " has been successfully deleted.")
 
     def put(self, movieId=None):
         if movieId:
@@ -105,7 +112,7 @@ class MovieHandler(webapp2.RequestHandler):
                 movieObj.put()
                 self.response.write(json.dumps(movieObj.to_dict()))
             else:
-                self.response.write("title field required!")
+                self.response.write("Title field required.")
 
     def patch(self, movieId=None):
         if movieId:
@@ -115,20 +122,27 @@ class MovieHandler(webapp2.RequestHandler):
             for key, value in movieData.iteritems():
                 setattr(movieObj, key, value)
             movieObj.put()
-            self.response.write(json.dumps(movieObj.to_dict()))
+            self.response.write("Movie successfully updated!")
 
 class StreamingProviderHandler(webapp2.RequestHandler):
     def post(self):
         streamingProviderData = json.loads(self.request.body)
-        newStreamingProvider = StreamingProvider(name=streamingProviderData['name'])
-        # propagate values for newStreamingProvider
+        # Title field must be present to PUT
         for key, value in streamingProviderData.iteritems():
-            setattr(newStreamingProvider, key, value)
-        newStreamingProvider.put()
-        newStreamingProvider.id = newStreamingProvider.key.id()
-        newStreamingProvider.self = "/streaming-providers/" + str(newStreamingProvider.key.id())
-        newStreamingProvider.put()
-        self.response.write(json.dumps(newStreamingProvider.to_dict()))
+            if key == "name":
+                namePresent = True
+        if namePresent:
+            newStreamingProvider = StreamingProvider(name=streamingProviderData['name'])
+            # propagate values for newStreamingProvider
+            for key, value in streamingProviderData.iteritems():
+                setattr(newStreamingProvider, key, value)
+            newStreamingProvider.put()
+            newStreamingProvider.id = newStreamingProvider.key.id()
+            newStreamingProvider.self = "/streaming-providers/" + str(newStreamingProvider.key.id())
+            newStreamingProvider.put()
+            self.response.write("Streaming provider successfully added!")
+        else:
+            self.response.write("Name field is required.")
 
     def get(self, streamingProviderId=None, queryString=None):
         if streamingProviderId:
@@ -154,7 +168,7 @@ class StreamingProviderHandler(webapp2.RequestHandler):
         if streamingProviderId:
             streamingProviderObj = StreamingProvider.get_by_id(int(streamingProviderId))
             streamingProviderObj.key.delete()
-            self.response.write(streamingProviderObj.name + " has been deleted.")
+            self.response.write(streamingProviderObj.name + " has been successfully deleted.")
 
     def put(self, streamingProviderId=None):
         if streamingProviderId:
@@ -176,7 +190,7 @@ class StreamingProviderHandler(webapp2.RequestHandler):
                 streamingProviderObj.put()
                 self.response.write(json.dumps(streamingProviderObj.to_dict()))
             else:
-                self.response.write("name field required!")
+                self.response.write("Name field is required.")
 
     def patch(self, streamingProviderId=None):
         if streamingProviderId:
@@ -186,7 +200,7 @@ class StreamingProviderHandler(webapp2.RequestHandler):
             for key, value in streamingProviderData.iteritems():
                 setattr(streamingProviderObj, key, value)
             streamingProviderObj.put()
-            self.response.write(json.dumps(streamingProviderObj.to_dict()))
+            self.response.write("Streaming provider successfully updated!")
 
 class ProviderGetMoviesHandler(webapp2.RequestHandler):
     def get(self, streamingProviderId=None):
